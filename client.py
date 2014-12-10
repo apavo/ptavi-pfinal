@@ -8,10 +8,13 @@ import socket
 import sys
 from xml.sax import make_parser
 from xml.sax.handler import ContentHandler
+import time
 # Cliente SIP simple.
 
-class SmallSMILHandler(ContentHandler):
-
+class DtdXMLHandler(ContentHandler):
+    """
+    Clase que lee DTD
+    """
     def __init__(self):
         self.lista = []
 
@@ -44,6 +47,7 @@ class SmallSMILHandler(ContentHandler):
         
 
     def guardar(self, attrs, diccionario):
+        #Guarda en un diccionario los atributos de cada etiqueta
         atributos = attrs.keys()
         n = 0
         while n < len(atributos):
@@ -56,7 +60,31 @@ if __name__ == "__main__":
     metodo=sys.argv[2].upper()
     opcion=sys.argv[3]
     parser = make_parser()
-    sHandler = SmallSMILHandler()
+    sHandler = DtdXMLHandler()
     parser.setContentHandler(sHandler)
     parser.parse(open(CONFIG))
-    print sHandler.lista
+    registro=sHandler.lista
+    usuario=registro[0][1]["username"]
+    ip_ua = registro[1][1]["ip"]
+    puerto_ua = registro[1][1]["puerto"]
+    ip_proxy = registro[3][1]["ip"]
+    puerto_proxy = registro[3][1]["puerto"]
+    log=registro[4][1]["path"]
+    hora = time.strftime('%Y%m%d%H%M%S',time.gmtime(time.time()))
+    log_ua = open(log,"a")
+    log_ua.write("...\n")
+    #Creamos el socket, lo configuramos y lo atamos a un servidor/puerto
+    my_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    my_socket.connect((ip_proxy,int(puerto_proxy)))
+    #Definimos las acciones de cada metodo
+    if metodo == "REGISTRER":
+        line = "REGISTRER " + "sip:" + usuario + ":" + puerto_ua
+        line += " SIP/2.0" + "\r\n"  + "Expires:" + opcion + "\r\n" + "\r\n"
+        log_ua.write(hora + " Starting...")
+        hora = time.strftime('%Y%m%d%H%M%S',time.gmtime(time.time()))
+        evento = " Sent to " + ip + ":" + puerto + ":" + "REGISTER" + "sip:"
+        evento += usuario + ":" + puerto_ua + " SIP/2.0" + "[...]"
+        log_ua.write(hora + evento)
+     
+
