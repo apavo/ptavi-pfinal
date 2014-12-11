@@ -75,23 +75,23 @@ if __name__ == "__main__":
     hora = time.strftime('%Y%m%d%H%M%S',
     time.gmtime(time.time()))
     log_ua = open(log, "a")
-    log_ua.write("...\n")
+    log_ua.write("...\r\n")
     #Creamos el socket, lo configuramos y lo atamos a un servidor/puerto
     my_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     my_socket.connect((ip_proxy, int(puerto_proxy)))
     #Definimos las acciones de cada metodo
-    if metodo == "REGISTRER":
-        line = "REGISTRER " + "sip:" + usuario + ":" + puerto_ua
+    if metodo == "REGISTER":
+        line = "REGISTER " + "sip:" + usuario + ":" + puerto_ua
         line += " SIP/2.0" + "\r\n" + "Expires:" + opcion + "\r\n" + "\r\n"
-        log_ua.write(hora + " Starting...")
+        log_ua.write(hora + " Starting..." + "\r\n")
         hora = time.strftime('%Y%m%d%H%M%S',
         time.gmtime(time.time()))
         evento = " Sent to " + ip_proxy + ":" + puerto_proxy + ":" + "REGISTER"
         evento += "sip:" + usuario + ":" + puerto_ua + " SIP/2.0" + "[...]"
-        log_ua.write(hora + evento)
+        log_ua.write(hora + evento + "\r\n")
     elif metodo == "INVITE":
-        line = "INVITE " + + "sip:" + sys.argv[3]
+        line = "INVITE " + "sip:" + sys.argv[3]
         line += " SIP/2.0" + "\r\n" + "Content-type:application/sdp\r\n \r\n"
         line += "v=0\r\no=" + usuario + ip_ua + "\r\ns=misesion"
         line += "\r\nt=0\r\nm=audio" + puerto_rtp + "RTP"
@@ -99,3 +99,10 @@ if __name__ == "__main__":
         time.gmtime(time.time()))
         evento = " Sent to " + ip_proxy + ":" + puerto_proxy + ":" + "INVITE "
         evento += sys.argv[3] + "[...]"
+        log_ua.write(hora + evento + "\r\n")
+    elif metodo == "BYE"
+        line = "BYE " + "sip:" + sys.argv[3] + " SIP/2.0\r\n\r\n"
+        hora = hora = hora = time.strftime('%Y%m%d%H%M%S',
+        time.gmtime(time.time()))
+        evento = " Sent to " + ip_proxy + ":" + puerto_proxy + ": BYE [...]"
+        log_ua.write(hora + evento + "\r\n")
