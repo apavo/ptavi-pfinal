@@ -64,11 +64,13 @@ if __name__ == "__main__":
     parser.setContentHandler(sHandler)
     parser.parse(open(CONFIG))
     registro=sHandler.lista
+    #Obtenemos los datos contenidos en DTD
     usuario=registro[0][1]["username"]
     ip_ua = registro[1][1]["ip"]
     puerto_ua = registro[1][1]["puerto"]
     ip_proxy = registro[3][1]["ip"]
     puerto_proxy = registro[3][1]["puerto"]
+    puerto_rtp = registro[2][1]["puerto"]
     log=registro[4][1]["path"]
     hora = time.strftime('%Y%m%d%H%M%S',time.gmtime(time.time()))
     log_ua = open(log,"a")
@@ -80,11 +82,19 @@ if __name__ == "__main__":
     #Definimos las acciones de cada metodo
     if metodo == "REGISTRER":
         line = "REGISTRER " + "sip:" + usuario + ":" + puerto_ua
-        line += " SIP/2.0" + "\r\n"  + "Expires:" + opcion + "\r\n" + "\r\n"
+        line += " SIP/2.0" + "\r\n" + "Expires:" + opcion + "\r\n" + "\r\n"
         log_ua.write(hora + " Starting...")
         hora = time.strftime('%Y%m%d%H%M%S',time.gmtime(time.time()))
-        evento = " Sent to " + ip + ":" + puerto + ":" + "REGISTER" + "sip:"
+        evento = " Sent to " + ip_proxy + ":" + puerto_proxy + ":" + "REGISTER" + "sip:"
         evento += usuario + ":" + puerto_ua + " SIP/2.0" + "[...]"
         log_ua.write(hora + evento)
+    elif metodo == "INVITE":
+        line = "INVITE " + + "sip:" + sys.argv[3]
+        line += " SIP/2.0" + "\r\n" + "Content-type:application/sdp \r\n \r\n"
+        line += "v=0\r\no=" + usuario + ip_ua + "\r\ns=misesion"
+        line += "\r\nt=0\r\nm=audio" + puerto_rtp + "RTP"
+        hora = hora = time.strftime('%Y%m%d%H%M%S',time.gmtime(time.time()))
+        evento = " Sent to " + ip_proxy + ":" + puerto_proxy + ":" + "INVITE "
+        evento += sys.argv[3] + "[...]"
      
 
