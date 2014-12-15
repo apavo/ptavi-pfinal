@@ -17,41 +17,30 @@ class DtdXMLHandler(ContentHandler):
     Clase que lee DTD
     """
     def __init__(self):
-        self.lista = []
+
+        self.diccionario = {}
 
     def startElement(self, name, attrs):
 
         if name == "account":
-            self.account = {}
-            self.guardar(attrs, self.account)
-            self.lista.append([name, self.account])
+            self.guardar(attrs)
         elif name == "uaserver":
-            self.uaserver = {}
-            self.guardar(attrs, self.uaserver)
-            self.lista.append([name, self.uaserver])
+            self.guardar(attrs)
         elif name == "rtpaudio":
-            self.rtpaudio = {}
-            self.guardar(attrs, self.rtpaudio)
-            self.lista.append([name, self.rtpaudio])
+            self.guardar(attrs)
         elif name == "regproxy":
-            self.regproxy = {}
-            self.guardar(attrs, self.regproxy)
-            self.lista.append([name, self.regproxy])
+            self.guardar(attrs)
         elif name == "log":
-            self.log = {}
-            self.guardar(attrs, self.log)
-            self.lista.append([name, self.log])
+            self.guardar(attrs)
         elif name == "audio":
-            self.audio = {}
-            self.guardar(attrs, self.audio)
-            self.lista.append([name, self.audio])
+            self.guardar(attrs)
 
-    def guardar(self, attrs, diccionario):
+    def guardar(self, attrs):
         #Guarda en un diccionario los atributos de cada etiqueta
         atributos = attrs.keys()
         n = 0
         while n < len(atributos):
-            diccionario[str(atributos[n])] = str(attrs.get(atributos[n], ""))
+            self.diccionario[str(atributos[n])] = str(attrs.get(atributos[n], ""))
             n = n + 1
 
 if __name__ == "__main__":
@@ -63,15 +52,16 @@ if __name__ == "__main__":
     sHandler = DtdXMLHandler()
     parser.setContentHandler(sHandler)
     parser.parse(open(CONFIG))
-    registro = sHandler.lista
+    registro = sHandler.diccionario
+    print registro
     #Obtenemos los datos contenidos en DTD
-    usuario = registro[0][1]["username"]
-    ip_ua = registro[1][1]["ip"]
-    puerto_ua = registro[1][1]["puerto"]
-    ip_proxy = registro[3][1]["ip"]
-    puerto_proxy = registro[3][1]["puerto"]
-    puerto_rtp = registro[2][1]["puerto"]
-    log = registro[4][1]["path"]
+    usuario = registro["username"]
+    ip_ua = registro["uaserver_ip"]
+    puerto_ua = registro["uaserver_puerto"]
+    ip_proxy = registro["regproxy_ip"]
+    puerto_proxy = registro["regproxy_puerto"]
+    puerto_rtp = registro["rtpaudio_puerto"]
+    log = registro["log_path"]
     hora = time.strftime('%Y%m%d%H%M%S',
     time.gmtime(time.time()))
     log_ua = open(log, "a")
@@ -87,7 +77,7 @@ if __name__ == "__main__":
         log_ua.write(hora + " Starting..." + "\r\n")
         hora = time.strftime('%Y%m%d%H%M%S',
         time.gmtime(time.time()))
-        evento = " Sent to " + ip_proxy + ":" + puerto_proxy + ":" + "REGISTER"
+        evento = " Sent to " + ip_proxy + ":" + puerto_proxy + ":" + "REGISTER "
         evento += "sip:" + usuario + ":" + puerto_ua + " SIP/2.0" + "[...]"
         log_ua.write(hora + evento + "\r\n")
     elif metodo == "INVITE":
@@ -100,7 +90,7 @@ if __name__ == "__main__":
         evento = " Sent to " + ip_proxy + ":" + puerto_proxy + ":" + "INVITE "
         evento += sys.argv[3] + "[...]"
         log_ua.write(hora + evento + "\r\n")
-    elif metodo == "BYE"
+    elif metodo == "BYE":
         line = "BYE " + "sip:" + sys.argv[3] + " SIP/2.0\r\n\r\n"
         hora = hora = hora = time.strftime('%Y%m%d%H%M%S',
         time.gmtime(time.time()))
