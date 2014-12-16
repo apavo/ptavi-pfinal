@@ -39,7 +39,7 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
         elif metodo == "ACK":
             #Enviamos el audio
             AUDIO = registro['audio_path']
-            aEjecutar = './mp32rtp -i ' IP_CLIENT + ' -p ' + PORT_CLIENT < + AUDIO
+            aEjecutar = './mp32rtp -i ' + IP_CLIENT + ' -p ' + PORT_CLIENT < + AUDIO
             os.system(aEjecutar)
         elif metodo == "BYE":
             line = 'SIP/2.0 200 OK' + '\r\n' + '\r\n'
@@ -67,14 +67,16 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
 if __name__ == "__main__":
 
     CONFIG= sys.argv[1]
+    #Leemos la DTD usando la clase definida en client.py
     parser = make_parser()
-    sHandler = client.DtdXMLHandler()
-    parser.setContentHandler(sHandler)
+    pHandler = client.DtdXMLHandler()
+    parser.setContentHandler(pHandler)
     parser.parse(open(CONFIG))
-    registro = sHandler.diccionario
-    HOST = registro["uaserver_ip"]
-    PORT = int(registro["uaserver_puerto"])
+    registro = pHandler.diccionario
+    print registro
+    HOST = registro["ip"]
+    PORT = int(registro["port"])
     serv = SocketServer.UDPServer((HOST, PORT), SIPHandler)
-    print "Listening..." 
+    print "Server " + registro["name"] + " Listening at port " + registro["port"] 
     serv.serve_forever()
 
