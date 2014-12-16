@@ -1,0 +1,5 @@
+<config>
+    <server name="ProxyServer" ip="127.0.01" port="7000"/>
+    <database database_path="datos.txt"/>
+    <log log_path="log_pr.txt"/> 
+</config>
