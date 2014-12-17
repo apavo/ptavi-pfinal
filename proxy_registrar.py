@@ -3,7 +3,7 @@
 """
 Clase (y programa principal) para un servidor de eco en UDP simple
 """
-
+import socket
 import SocketServer
 import sys
 import os
@@ -15,7 +15,7 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
     """
     SIP server class
     """
-    diccionario{}
+    diccionario = {}
 
     def procesar(self, line, HOST):
         """
@@ -35,39 +35,43 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
             self.diccionario[direccion] = lista
             fecha_registro = time.time()
             #Abrimos el fichero para escribir los datos del nuevo usuario
-            database = open(registro["database_path"], a)
+            database = open(registro["database_path"], "a")
             database.write(direccion + "\t" + IP_CLIENT + "\t" + PORT_CLIENT
-            + "\t" + fecha_registro + EXPIRES + '\r\n')
+            + "\t" + str(fecha_registro) + EXPIRES + '\r\n')
             #Abrimos el fichero log y escribimos el mensaje recibido
-            log_proxy=open(regitro["log_path"], a)
+            log_proxy=open(registro["log_path"], "a")
             hora = time.strftime('%Y%m%d%H%M%S',
             time.gmtime(time.time()))
             log_proxy.write(hora + " Received from " + IP_CLIENT + ":"
             + PORT_CLIENT + ":" + line + '\r\n')
-        else
+            log_proxy.close()
+            database.close()
+        else:
             #Buscamos al usuario en el diccionario
             reg_direcciones = self.diccionario.keys()
-            registrado = false
+            registrado = True
             n = 0
-            while not registrado or n < len(reg_direcciones):
-                if direccion = reg_direcciones(n):
-                    encontrado = true
-                    direccion = reg_direcciones(n)
+            print reg_direcciones
+            while not registrado and n < len(reg_direcciones):
+                if direccion == reg_direcciones[n]:
+                    registrado = True
+                    direccion = reg_direcciones[n]
                 else: 
                     n = n + 1
             if registrado:
                 if metodo == "INVITE":
-                    #Escribimos el mensaje recibido
-                    hora = time.strftime('%Y%m%d%H%M%S',
-                    time.gmtime(time.time()))
-                    log_proxy.write(hora + " Received from " + ip_ua1 + ":"
-                    + port_ua1 + ":" + line + '\r\n')
                     #Obtenemos los datos del cliente y el destinatario
                     informacion=line.split('\r\n')
                     ip_ua1 = informacion[4].split(" ")[1]
                     port_ua1 = informacion[7].split(" ")[1]
                     ip_ua2 = self.diccionario[direccion][0]
                     port_ua2 = self.diccionario[direccion][1] 
+                    #Escribimos el mensaje recibido
+                    log_proxy=open(registro["log_path"], "a")
+                    hora = time.strftime('%Y%m%d%H%M%S',
+                    time.gmtime(time.time()))
+                    log_proxy.write(hora + " Received from " + ip_ua1 + ":"
+                    + port_ua1 + ":" + line + '\r\n')
                     #Enviamos el mensaje a su destino y esperamos respuesta
                     my_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                     my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -82,27 +86,13 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
                     time.gmtime(time.time()))
                     log_proxy.write(hora + ' Received from ' + ip_ua2 + ":"
                     + port_ua2 + data + '\r\n')
-                     #Enviamos la contestacion del destinatario al cliente
+                    #Enviamos la contestacion del destinatario al cliente
                     self.wfile.write(data)
                     print data
                     log_proxy.write(hora + "Send to " + ip_ua1 + ":" + port_ua1
                     + ":" + data + '\r\n')
-                    
-        elif metodo == "ACK":
-            #Enviamos el audio
-            AUDIO = registro['audio_path']
-            aEjecutar = './mp32rtp -i ' + IP_CLIENT + ' -p ' + PORT_CLIENT < + AUDIO
-            os.system(aEjecutar)
-        elif metodo == "BYE":
-            line = 'SIP/2.0 200 OK' + '\r\n' + '\r\n'
-            self.wfile.write(line)
-        elif metodo != "INVITE" or "ACK" or "BYE":
-            line = "SIP/2.0 405 Method Not Allowed" + '\r\n' + '\r\n'
-            self.wfile.write(line)
-        else:
-            line = "SIP/2.0 400 Bad Request" + '\r\n' + '\r\n'
-            self.wfile.write(line)
-
+                    log_proxy.close()
+                    my_socket.close()
     def handle(self):
         # Escribe dirección y puerto del cliente (de tupla client_address)
         while 1:
@@ -125,7 +115,6 @@ if __name__ == "__main__":
     parser.setContentHandler(pHandler)
     parser.parse(open(CONFIG))
     registro = pHandler.diccionario
-    print registro
     HOST = registro["ip"]
     PORT = int(registro["port"])
     serv = SocketServer.UDPServer((HOST, PORT), SIPHandler)
