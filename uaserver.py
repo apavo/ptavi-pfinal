@@ -30,11 +30,11 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
             PORT_CLIENT = informacion[7].split(" ")[1]
             #Creamos los mensajes de respuesta
             line = 'SIP/2.0 100 Trying' + '\r\n' + '\r\n'
-            line += 'SIP/2.0 180 Ringing' + '\r\n' + 'Content-Type: '
-            line += 'SIP/2.0 200 OK' + '\r\n' + '\r\n' 
-            line += 'apliccation/SDP\r\n\r\nv=0\r\no=' + registro['username']
-            line += registro['uaserver_ip'] + '\r\ns=misesion\r\nt=0m=audio'
-            line += registro['rtpaudio_puerto'] 
+            line += 'SIP/2.0 180 Ringing' + '\r\n' + '\r\n'
+            line += 'SIP/2.0 200 OK' + '\r\n' 
+            line += 'Content-Type:apliccation/SDP\r\n\r\nv=0\r\no=' + registro['username']
+            line += registro['uaserver_ip'] + '\r\ns=misesion\r\nt=0\r\n'
+            line += 'm=audio ' + registro['rtpaudio_puerto'] + ' RTP\r\n' 
             self.wfile.write(line)
         elif metodo == "ACK":
             #Enviamos el audio
