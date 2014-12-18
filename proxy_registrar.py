@@ -17,6 +17,53 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
     """
     diccionario = {}
 
+    def buscar_datos(self, registro):
+        #Comprueba que el cliente este regitrado y su puerto
+        encontrado = True
+        IP = str(self.client_address[0])  
+        port = 0
+        while not encontrado and n < len(registro):
+            if self.diccionario[registro[n]][0] == IP
+                encontrado = True
+                port = registro[n][1]
+            else
+                encontrado = False
+        return encontrado,port
+
+    def reenvio(self, ip_ua1, port_ua1, metodo):
+        #Envia el mensaje al destinatario
+        ip_ua2 = self.diccionario[direccion][0]
+        port_ua2 = self.diccionario[direccion][1] 
+        #Escribimos el mensaje recibido
+        log_proxy=open(registro["log_path"], "a")
+        hora = time.strftime('%Y%m%d%H%M%S',
+        time.gmtime(time.time()))
+        log_proxy.write(hora + " Received from " + ip_ua1 + ":"
+        + port_ua1 + ":" + line + '\r\n')
+        #Enviamos el mensaje a su destino
+        my_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        my_socket.connect((ip_ua2, int(port_ua2)))
+        my_socket.send(line)
+        hora = time.strftime('%Y%m%d%H%M%S',
+        time.gmtime(time.time()))
+        log_proxy.write(hora + "Send to " + ip_ua2 + ":" + port_ua2
+        + ":" + line + '\r\n')
+        #Si no es un ACK esperamos contestacion
+        if metodo != ACK:
+            data = my_socket.recv(1024)
+            hora = time.strftime('%Y%m%d%H%M%S',
+            time.gmtime(time.time()))
+            log_proxy.write(hora + ' Received from ' + ip_ua2 + ":"
+            + port_ua2 + data + '\r\n')
+            #Enviamos la contestacion del destinatario al cliente
+            self.wfile.write(data)
+            print data
+            log_proxy.write(hora + "Send to " + ip_ua1 + ":" + port_ua1
+            + ":" + data + '\r\n')
+        log_proxy.close()
+        my_socket.close()
+
     def procesar(self, line, HOST):
         """
         Procesa los mensajes recibidos
@@ -51,7 +98,6 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
             reg_direcciones = self.diccionario.keys()
             registrado = True
             n = 0
-            print reg_direcciones
             while not registrado and n < len(reg_direcciones):
                 if direccion == reg_direcciones[n]:
                     registrado = True
@@ -59,40 +105,25 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
                 else: 
                     n = n + 1
             if registrado:
-                if metodo == "INVITE":
-                    #Obtenemos los datos del cliente y el destinatario
-                    informacion=line.split('\r\n')
-                    ip_ua1 = informacion[4].split(" ")[1]
-                    port_ua1 = informacion[7].split(" ")[1]
-                    ip_ua2 = self.diccionario[direccion][0]
-                    port_ua2 = self.diccionario[direccion][1] 
-                    #Escribimos el mensaje recibido
-                    log_proxy=open(registro["log_path"], "a")
-                    hora = time.strftime('%Y%m%d%H%M%S',
-                    time.gmtime(time.time()))
-                    log_proxy.write(hora + " Received from " + ip_ua1 + ":"
-                    + port_ua1 + ":" + line + '\r\n')
-                    #Enviamos el mensaje a su destino y esperamos respuesta
-                    my_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                    my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                    my_socket.connect((ip_ua2, int(port_ua2)))
-                    my_socket.send(line)
-                    hora = time.strftime('%Y%m%d%H%M%S',
-                    time.gmtime(time.time()))
-                    log_proxy.write(hora + "Send to " + ip_ua2 + ":" + port_ua2
-                    + ":" + line + '\r\n')
-                    data = my_socket.recv(1024)
-                    hora = time.strftime('%Y%m%d%H%M%S',
-                    time.gmtime(time.time()))
-                    log_proxy.write(hora + ' Received from ' + ip_ua2 + ":"
-                    + port_ua2 + data + '\r\n')
-                    #Enviamos la contestacion del destinatario al cliente
-                    self.wfile.write(data)
-                    print data
-                    log_proxy.write(hora + "Send to " + ip_ua1 + ":" + port_ua1
-                    + ":" + data + '\r\n')
-                    log_proxy.close()
-                    my_socket.close()
+                if metodo == "INVITE" or metodo == "BYE" or metodo == "ACK":
+                    if metodo == "INVITE"
+                        #Obtenemos los datos del cliente contenidos en SDP
+                        informacion = line.split('\r\n')
+                        ip_ua1 = informacion[4].split(" ")[1]
+                        port_ua1 = informacion[7].split(" ")[1]
+                        self.reenvio(ip_ua1 , port_ua1)
+                    if metodo == "BYE" or metodo == "ACK"
+                        #Comprobamos que el emisor esta registrado y si es asi obtenemos sus datos
+                        port = self.buscar_datos(reg_direcciones)
+                        if encontrado:
+                             ip_ua1 = str(self.client_address[0])
+                             port_ua1 = port
+                             self.reenvio(ip_ua1, port_ua1, metodo)
+                        else
+                            self.wfile.write("Debes registrarte primero") ### REVISAAAAAAAAAAAAAARRRRRRRRRRRRRRRRRRRR!!!!!!!!!!!!!!!
+                    
+                    
+            
     def handle(self):
         # Escribe dirección y puerto del cliente (de tupla client_address)
         while 1:
