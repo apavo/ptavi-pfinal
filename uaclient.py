@@ -54,7 +54,7 @@ if __name__ == "__main__":
         log_ua.write(hora + "Received from " + ip_proxy
         + ":" + puerto_proxy + data + '\r\n')
         contestacion = data.split(" ")
-        if contestacion[-1] == "OK\r\n\r\n":
+        if contestacion[5] == "200":
             line = "ACK " + 'sip:' + opcion + ' SIP/2.0'
             line += '\r\n' + '\r\n'
             my_socket.send(line)
@@ -117,6 +117,9 @@ if __name__ == "__main__":
         time.gmtime(time.time()))
         evento = " Sent to " + ip_proxy + ":" + puerto_proxy + line
         log_ua.write(hora + evento + "\r\n")
+        my_socket.send(line)
+        data = my_socket.recv(1024)
+        print data
     else:    
         #Si el cliente escribe mal un metodo tambien lo enviamos el servidor se encarga de mandarnos el mensaje de error
         my_socket.send(line)

@@ -7,7 +7,7 @@ import socket
 import SocketServer
 import sys
 import os
-import client
+import uaclient
 from xml.sax import make_parser
 from xml.sax.handler import ContentHandler
 import time
@@ -23,14 +23,14 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
         IP = str(self.client_address[0])  
         port = 0
         while not encontrado and n < len(registro):
-            if self.diccionario[registro[n]][0] == IP
+            if self.diccionario[registro[n]][0] == IP:
                 encontrado = True
                 port = registro[n][1]
-            else
+            else:
                 encontrado = False
         return encontrado,port
 
-    def reenvio(self, ip_ua1, port_ua1, metodo):
+    def reenvio(self, ip_ua1, port_ua1, metodo, direccion, line):
         #Envia el mensaje al destinatario
         ip_ua2 = self.diccionario[direccion][0]
         port_ua2 = self.diccionario[direccion][1] 
@@ -39,7 +39,7 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
         hora = time.strftime('%Y%m%d%H%M%S',
         time.gmtime(time.time()))
         log_proxy.write(hora + " Received from " + ip_ua1 + ":"
-        + port_ua1 + ":" + line + '\r\n')
+        + str(port_ua1) + ":" + line + '\r\n')
         #Enviamos el mensaje a su destino
         my_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -50,7 +50,7 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
         log_proxy.write(hora + "Send to " + ip_ua2 + ":" + port_ua2
         + ":" + line + '\r\n')
         #Si no es un ACK esperamos contestacion
-        if metodo != ACK:
+        if metodo != "ACK":
             data = my_socket.recv(1024)
             hora = time.strftime('%Y%m%d%H%M%S',
             time.gmtime(time.time()))
@@ -59,7 +59,7 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
             #Enviamos la contestacion del destinatario al cliente
             self.wfile.write(data)
             print data
-            log_proxy.write(hora + "Send to " + ip_ua1 + ":" + port_ua1
+            log_proxy.write(hora + "Send to " + ip_ua1 + ":" + str(port_ua1)
             + ":" + data + '\r\n')
         log_proxy.close()
         my_socket.close()
@@ -105,25 +105,38 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
                 else: 
                     n = n + 1
             if registrado:
-                if metodo == "INVITE" or metodo == "BYE" or metodo == "ACK":
-                    if metodo == "INVITE"
+                if metodo == "INVITE" or "BYE" or "ACK":
+                    if metodo == "INVITE":
                         #Obtenemos los datos del cliente contenidos en SDP
                         informacion = line.split('\r\n')
                         ip_ua1 = informacion[4].split(" ")[1]
                         port_ua1 = informacion[7].split(" ")[1]
-                        self.reenvio(ip_ua1 , port_ua1)
-                    if metodo == "BYE" or metodo == "ACK"
+                        self.reenvio(ip_ua1 , port_ua1, metodo, direccion, line)
+                    if metodo == "BYE" or "ACK":
                         #Comprobamos que el emisor esta registrado y si es asi obtenemos sus datos
-                        port = self.buscar_datos(reg_direcciones)
+                        encontrado,port_ua1 = self.buscar_datos(reg_direcciones)
                         if encontrado:
                              ip_ua1 = str(self.client_address[0])
-                             port_ua1 = port
-                             self.reenvio(ip_ua1, port_ua1, metodo)
-                        else
+                             self.reenvio(ip_ua1, port_ua1, metodo, direccion, line)
+                        else:
                             self.wfile.write("Debes registrarte primero") ### REVISAAAAAAAAAAAAAARRRRRRRRRRRRRRRRRRRR!!!!!!!!!!!!!!!
-                    
-                    
-            
+                   else:
+                            #si nos envia un metodo no valido se lo notificamos
+                            linea = "SIP/2.0 405 Method Not Allowed" + '\r\n' + '\r\n'
+                            self.wfile.write(linea)
+                            hora = hora = time.strftime('%Y%m%d%H%M%S',
+                            time.gmtime(time.time()))
+                            encontrado,port = self.buscar_datos(registro)
+                            log_proxy.write(hora + "Send to: " + str(self.client_address[0])
+                            + ":" + port + ":" + linea + '\r\n')       
+            else:
+                linea = "SIP/2.0 404 User Not Found: usuario no registrado"
+                self.wfile.write(linea)
+                hora = hora = time.strftime('%Y%m%d%H%M%S',
+                time.gmtime(time.time()))
+                encontrado,port = self.buscar_datos(registro)
+                log_proxy.write(hora + "Send to: " + str(self.client_address[0]) 
+                + ":" + port + ":" + linea + '\r\n')            
     def handle(self):
         # Escribe dirección y puerto del cliente (de tupla client_address)
         while 1:
@@ -136,13 +149,12 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
                 self.procesar(line, HOST)
                 # Si no hay más líneas salimos del bucle infinito
 
-
 if __name__ == "__main__":
 
     CONFIG= sys.argv[1]
     #Leemos la DTD usando la clase definida en client.py
     parser = make_parser()
-    pHandler = client.DtdXMLHandler()
+    pHandler = uaclient.DtdXMLHandler()
     parser.setContentHandler(pHandler)
     parser.parse(open(CONFIG))
     registro = pHandler.diccionario
