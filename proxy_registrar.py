@@ -7,7 +7,7 @@ import socket
 import SocketServer
 import sys
 import os
-import uaclient
+import uaserver
 from xml.sax import make_parser
 from xml.sax.handler import ContentHandler
 import time
@@ -17,17 +17,22 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
     """
     diccionario = {}
 
-    def buscar_datos(self, registro):
+    def buscar_datos(self):
         #Comprueba que el cliente este regitrado y su puerto
-        encontrado = True
+        encontrado = False
         IP = str(self.client_address[0])  
         port = 0
-        while not encontrado and n < len(registro):
-            if self.diccionario[registro[n]][0] == IP:
-                encontrado = True
-                port = registro[n][1]
-            else:
-                encontrado = False
+        n = 0
+        claves = self.diccionario.keys()
+        if len(claves) == 0:
+            encontrado = False
+        else:
+            while not encontrado and n < len(claves):
+                if self.diccionario[claves[n]][0] == IP:
+                    encontrado = True
+                    port = claves[n][1]
+                else:
+                    n = n + 1
         return encontrado,port
 
     def reenvio(self, ip_ua1, port_ua1, metodo, direccion, line):
@@ -52,6 +57,7 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
         #Si no es un ACK esperamos contestacion
         if metodo != "ACK":
             data = my_socket.recv(1024)
+            my_socket.close()
             hora = time.strftime('%Y%m%d%H%M%S',
             time.gmtime(time.time()))
             log_proxy.write(hora + ' Received from ' + ip_ua2 + ":"
@@ -62,7 +68,7 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
             log_proxy.write(hora + "Send to " + ip_ua1 + ":" + str(port_ua1)
             + ":" + data + '\r\n')
         log_proxy.close()
-        my_socket.close()
+
 
     def procesar(self, line, HOST):
         """
@@ -96,7 +102,7 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
         else:
             #Buscamos al usuario en el diccionario
             reg_direcciones = self.diccionario.keys()
-            registrado = True
+            registrado = False
             n = 0
             while not registrado and n < len(reg_direcciones):
                 if direccion == reg_direcciones[n]:
@@ -112,7 +118,7 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
                         ip_ua1 = informacion[4].split(" ")[1]
                         port_ua1 = informacion[7].split(" ")[1]
                         self.reenvio(ip_ua1 , port_ua1, metodo, direccion, line)
-                    if metodo == "BYE" or "ACK":
+                    elif metodo == "BYE" or "ACK":
                         #Comprobamos que el emisor esta registrado y si es asi obtenemos sus datos
                         encontrado,port_ua1 = self.buscar_datos(reg_direcciones)
                         if encontrado:
@@ -120,23 +126,29 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
                              self.reenvio(ip_ua1, port_ua1, metodo, direccion, line)
                         else:
                             self.wfile.write("Debes registrarte primero") ### REVISAAAAAAAAAAAAAARRRRRRRRRRRRRRRRRRRR!!!!!!!!!!!!!!!
-                   else:
-                            #si nos envia un metodo no valido se lo notificamos
-                            linea = "SIP/2.0 405 Method Not Allowed" + '\r\n' + '\r\n'
-                            self.wfile.write(linea)
-                            hora = hora = time.strftime('%Y%m%d%H%M%S',
-                            time.gmtime(time.time()))
-                            encontrado,port = self.buscar_datos(registro)
-                            log_proxy.write(hora + "Send to: " + str(self.client_address[0])
-                            + ":" + port + ":" + linea + '\r\n')       
+                    else:
+                        #si nos envia un metodo no valido se lo notificamos
+                        linea = "SIP/2.0 405 Method Not Allowed" + '\r\n' + '\r\n'
+                        print linea
+                        self.wfile.write(linea)
+                        hora = hora = time.strftime('%Y%m%d%H%M%S',
+                        time.gmtime(time.time()))
+                        encontrado,port = self.buscar_datos()
+                        log_proxy.write(hora + "Send to: " + str(self.client_address[0])
+                        + ":" + port + ":" + linea + '\r\n')       
             else:
-                linea = "SIP/2.0 404 User Not Found: usuario no registrado"
-                self.wfile.write(linea)
-                hora = hora = time.strftime('%Y%m%d%H%M%S',
-                time.gmtime(time.time()))
-                encontrado,port = self.buscar_datos(registro)
-                log_proxy.write(hora + "Send to: " + str(self.client_address[0]) 
-                + ":" + port + ":" + linea + '\r\n')            
+                encontrado,port = self.buscar_datos()
+                if encontrado:
+                    linea = "SIP/2.0 404 User Not Found: usuario no registrado"
+                    self.wfile.write(linea)
+                    hora = hora = time.strftime('%Y%m%d%H%M%S',
+                    time.gmtime(time.time()))
+                    log_proxy=open(registro["log_path"], "a")
+                    log_proxy.write(hora + "Send to: " + str(self.client_address[0]) 
+                    + ":" + str(port) + ":" + linea + '\r\n')
+                else:
+                    self.wfile.write("Debes registrarte primero") ### REVISAAAAAAAAAAAAAARRRRRRRRRRRRRRRRRRRR!!!!!!!!!!!!!!!
+                              
     def handle(self):
         # Escribe dirección y puerto del cliente (de tupla client_address)
         while 1:
@@ -154,7 +166,7 @@ if __name__ == "__main__":
     CONFIG= sys.argv[1]
     #Leemos la DTD usando la clase definida en client.py
     parser = make_parser()
-    pHandler = uaclient.DtdXMLHandler()
+    pHandler = uaserver.DtdXMLHandler()
     parser.setContentHandler(pHandler)
     parser.parse(open(CONFIG))
     registro = pHandler.diccionario

@@ -1,15 +1,48 @@
 #!/usr/bin/python
 # -*- coding: iso-8859-15 -*-
 """
-Clase (y programa principal) para un servidor de eco en UDP simple
+Clase (y programa principal) para un servidor SIP
 """
 
 import SocketServer
 import sys
 import os
-import uaclient
 from xml.sax import make_parser
 from xml.sax.handler import ContentHandler
+
+class DtdXMLHandler(ContentHandler):
+    """
+    Clase que lee DTD
+    """
+    def __init__(self):
+        self.diccionario = {}
+
+    def startElement(self, name, attrs):
+        if name == "account":
+            self.guardar(attrs)
+        elif name == "uaserver":
+            self.guardar(attrs)
+        elif name == "rtpaudio":
+            self.guardar(attrs)
+        elif name == "regproxy":
+            self.guardar(attrs)
+        elif name == "log":
+            self.guardar(attrs)
+        elif name == "audio":
+            self.guardar(attrs)
+        elif name =="server":
+            self.guardar(attrs)
+        elif name =="database":
+            self.guardar(attrs)
+
+    def guardar(self, attrs):
+        #Guarda en un diccionario los atributos de cada etiqueta
+        atributos = attrs.keys()
+        n = 0
+        while n < len(atributos):
+            self.diccionario[str(atributos[n])] = str(attrs.get(atributos[n], ""))
+            n = n + 1
+
 
 class SIPHandler(SocketServer.DatagramRequestHandler):
     """
@@ -35,7 +68,7 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
             line += 'SIP/2.0 180 Ringing' + '\r\n' + '\r\n'
             line += 'SIP/2.0 200 OK' + '\r\n'
             line += 'Content-Type:apliccation/SDP\r\n\r\nv=0\r\no=' + registro['username']
-            line += registro['uaserver_ip'] + '\r\ns=misesion\r\nt=0\r\n'
+            line += " " + registro['uaserver_ip'] + '\r\ns=misesion\r\nt=0\r\n'
             line += 'm=audio ' + registro['rtpaudio_puerto'] + ' RTP\r\n'
             self.wfile.write(line)
         elif metodo == "ACK":
@@ -47,7 +80,7 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
         elif metodo == "BYE":
             line = 'SIP/2.0 200 OK' + '\r\n'
             line += 'Content-Type:apliccation/SDP\r\n\r\nv=0\r\no=' + registro['username']
-            line += registro['uaserver_ip'] + '\r\ns=misesion\r\nt=0\r\n'
+            line += " " + registro['uaserver_ip'] + '\r\ns=misesion\r\nt=0\r\n'
             line += 'm=audio ' + registro['rtpaudio_puerto'] + ' RTP\r\n' 
             self.wfile.write(line)
         elif metodo != "INVITE" or "ACK" or "BYE":
@@ -71,17 +104,18 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
 
 
 if __name__ == "__main__":
-
+try:
     CONFIG= sys.argv[1]
     #Leemos la DTD usando la clase definida en client.py
     parser = make_parser()
-    sHandler = uaclient.DtdXMLHandler()
+    sHandler = DtdXMLHandler()
     parser.setContentHandler(sHandler)
     parser.parse(open(CONFIG))
     registro = sHandler.diccionario
     HOST = registro["uaserver_ip"]
     PORT = int(registro["uaserver_puerto"])
     serv = SocketServer.UDPServer((HOST, PORT), SIPHandler)
-    print "Listening..." 
+    print "Listening..."
     serv.serve_forever()
-
+except IndexError:
+    print "Usage: python uaserver.py config"
