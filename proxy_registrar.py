@@ -162,7 +162,7 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
                 # Si no hay más líneas salimos del bucle infinito
 
 if __name__ == "__main__":
-
+try:
     CONFIG= sys.argv[1]
     #Leemos la DTD usando la clase definida en client.py
     parser = make_parser()
@@ -175,3 +175,5 @@ if __name__ == "__main__":
     serv = SocketServer.UDPServer((HOST, PORT), SIPHandler)
     print "Server " + registro["name"] + " Listening at port " + registro["port"] 
     serv.serve_forever()
+except IndexError:
+    print "Usage: python proxy_registrar.py config"

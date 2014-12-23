@@ -107,8 +107,8 @@ except socket.error:
     log_ua.write(hora + "Error: No server listening at" + " " + ip_proxy 
     + " " + str(puerto_proxy))
 #except ValueError:
-#    print "1-Usage: python client.py method receiver@IP or expired value"
+#    print "Usage: python uaclient.py config method option"
 #except IndexError:
-#    print "Usage: python client.py method receiver@IP or expired value"
+#    print "Usage: python uaclient.py config method option"
 #except NameError:
-#    print "Usage: python client.py method receiver@IP or expired value"
+#    print "Usage: python uaclient.py config method option"
