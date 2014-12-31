@@ -11,6 +11,43 @@ import uaserver
 from xml.sax import make_parser
 from xml.sax.handler import ContentHandler
 import time
+
+class write_log():
+
+    def wr(self, log_path, linea):
+        log = open(log_path, "a")
+        hora = time.strftime('%Y%m%d%H%M%S',
+        time.gmtime(time.time()))
+        log.write(hora + " " + linea + '\r\n')
+        log.close
+
+class identification():
+
+    def crear_registro(self, fpaswords):
+        diccionario = {}
+        paswords = open(fpaswords)
+        contenido = paswords.readlines()
+        for usuario in contenido:
+            datos = usuario.split(" ")
+            diccionario[datos[0]] = datos[1]
+        return diccionario
+ 
+    def comprobar_cliente(self, diccionario, cliente, pasword):
+        claves = self.diccionario.keys()
+        correcto = False
+        n = 0
+        if len(claves) == 0:
+            #Si no hay nadie registrado no buscamos
+            correcto = False
+        else:
+            while not correcto and n < len(claves):
+                if clave[n] == nombre and diccionario[clave[n]] == pasword:
+                    correcto = True
+                else:
+                    n = n + 1
+        return correcto
+     
+
 class SIPHandler(SocketServer.DatagramRequestHandler):
     """
     SIP server class
@@ -25,6 +62,7 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
         n = 0
         claves = self.diccionario.keys()
         if len(claves) == 0:
+            #Si no hay nadie registrado no buscamos
             encontrado = False
         else:
             while not encontrado and n < len(claves):
@@ -40,34 +78,30 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
         ip_ua2 = self.diccionario[direccion][0]
         port_ua2 = self.diccionario[direccion][1] 
         #Escribimos el mensaje recibido
-        log_proxy=open(registro["log_path"], "a")
-        hora = time.strftime('%Y%m%d%H%M%S',
-        time.gmtime(time.time()))
-        log_proxy.write(hora + " Received from " + ip_ua1 + ":"
-        + str(port_ua1) + ":" + line + '\r\n')
+        evento = " Received from " + ip_ua1 + ":"
+        evento += str(port_ua1) + ": " + line
+        log.wr(log_path, evento)
         #Enviamos el mensaje a su destino
         my_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         my_socket.connect((ip_ua2, int(port_ua2)))
         my_socket.send(line)
-        hora = time.strftime('%Y%m%d%H%M%S',
-        time.gmtime(time.time()))
-        log_proxy.write(hora + "Send to " + ip_ua2 + ":" + port_ua2
-        + ":" + line + '\r\n')
+        evento = "Send to " + ip_ua2 + ":" + port_ua2
+        evento += ": " + line
+        log.wr(log_path, evento)
         #Si no es un ACK esperamos contestacion
         if metodo != "ACK":
             data = my_socket.recv(1024)
             my_socket.close()
-            hora = time.strftime('%Y%m%d%H%M%S',
-            time.gmtime(time.time()))
-            log_proxy.write(hora + ' Received from ' + ip_ua2 + ":"
-            + port_ua2 + data + '\r\n')
+            evento =' Received from ' + ip_ua2 + ": "
+            evento += port_ua2 + data
+            log.wr(log_path, evento)
             #Enviamos la contestacion del destinatario al cliente
             self.wfile.write(data)
             print data
-            log_proxy.write(hora + "Send to " + ip_ua1 + ":" + str(port_ua1)
-            + ":" + data + '\r\n')
-        log_proxy.close()
+            evento = "Send to " + ip_ua1 + ":" + str(port_ua1)
+            evento += ":" + data
+            log.wr(log_path, evento)
 
 
     def procesar(self, line, HOST):
@@ -90,15 +124,19 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
             #Abrimos el fichero para escribir los datos del nuevo usuario
             database = open(registro["database_path"], "a")
             database.write(direccion + "\t" + IP_CLIENT + "\t" + PORT_CLIENT
-            + "\t" + str(fecha_registro) + EXPIRES + '\r\n')
+            + "\t" + str(fecha_registro) + "\t" + EXPIRES + '\r\n')
             #Abrimos el fichero log y escribimos el mensaje recibido
-            log_proxy=open(registro["log_path"], "a")
-            hora = time.strftime('%Y%m%d%H%M%S',
-            time.gmtime(time.time()))
-            log_proxy.write(hora + " Received from " + IP_CLIENT + ":"
-            + PORT_CLIENT + ":" + line + '\r\n')
-            log_proxy.close()
+            evento = " Received from " + IP_CLIENT + ":"
+            evento += PORT_CLIENT + ": " + line
+            log.wr(log_path, evento)
+            #enviamos la confimacion al cliente
+            respuesta = 'SIP/2.0 200 OK' + '\r\n' + '\r\n'
+            self.wfile.write(respuesta)
+            evento = " Send to " + IP_CLIENT + ":"
+            evento += PORT_CLIENT + ": " + line
+            log.wr(log_path, evento)
             database.close()
+            
         else:
             #Buscamos al usuario en el diccionario
             reg_direcciones = self.diccionario.keys()
@@ -117,35 +155,42 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
                         informacion = line.split('\r\n')
                         ip_ua1 = informacion[4].split(" ")[1]
                         port_ua1 = informacion[7].split(" ")[1]
-                        self.reenvio(ip_ua1 , port_ua1, metodo, direccion, line)
+                        self.reenvio(ip_ua1, port_ua1, metodo, direccion, line)
                     elif metodo == "BYE" or "ACK":
                         #Comprobamos que el emisor esta registrado y si es asi obtenemos sus datos
-                        encontrado,port_ua1 = self.buscar_datos(reg_direcciones)
+                        encontrado,port_ua1 = self.buscar_datos()
                         if encontrado:
                              ip_ua1 = str(self.client_address[0])
                              self.reenvio(ip_ua1, port_ua1, metodo, direccion, line)
                         else:
                             self.wfile.write("Debes registrarte primero") ### REVISAAAAAAAAAAAAAARRRRRRRRRRRRRRRRRRRR!!!!!!!!!!!!!!!
                     else:
-                        #si nos envia un metodo no valido se lo notificamos
-                        linea = "SIP/2.0 405 Method Not Allowed" + '\r\n' + '\r\n'
+                        linea = "SIP/2.0 400 Bad Request" + "\r\n\r\n"
                         print linea
                         self.wfile.write(linea)
                         hora = hora = time.strftime('%Y%m%d%H%M%S',
                         time.gmtime(time.time()))
                         encontrado,port = self.buscar_datos()
-                        log_proxy.write(hora + "Send to: " + str(self.client_address[0])
-                        + ":" + port + ":" + linea + '\r\n')       
+                        evento = " Send to: " + str(self.client_address[0])
+                        evento += ":" + port + ": " + linea
+                        log.wr(log_path, evento)    
+                else:
+                    #si nos envia un metodo no valido se lo notificamos
+                    linea = "SIP/2.0 405 Method Not Allowed" + '\r\n' + '\r\n'
+                    print linea
+                    self.wfile.write(linea)
+                    encontrado,port = self.buscar_datos()
+                    evento ="Send to: " + str(self.client_address[0])
+                    evento += ":" + port + ":" + linea
+                    log.wr(log_path, evento)      
             else:
                 encontrado,port = self.buscar_datos()
                 if encontrado:
                     linea = "SIP/2.0 404 User Not Found: usuario no registrado"
                     self.wfile.write(linea)
-                    hora = hora = time.strftime('%Y%m%d%H%M%S',
-                    time.gmtime(time.time()))
-                    log_proxy=open(registro["log_path"], "a")
-                    log_proxy.write(hora + "Send to: " + str(self.client_address[0]) 
-                    + ":" + str(port) + ":" + linea + '\r\n')
+                    evento ="Send to: " + str(self.client_address[0]) 
+                    evento += ":" + str(port) + ":" + linea
+                    log.wr(log_path, evento)
                 else:
                     self.wfile.write("Debes registrarte primero") ### REVISAAAAAAAAAAAAAARRRRRRRRRRRRRRRRRRRR!!!!!!!!!!!!!!!
                               
@@ -162,18 +207,38 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
                 # Si no hay más líneas salimos del bucle infinito
 
 if __name__ == "__main__":
-try:
-    CONFIG= sys.argv[1]
-    #Leemos la DTD usando la clase definida en client.py
-    parser = make_parser()
-    pHandler = uaserver.DtdXMLHandler()
-    parser.setContentHandler(pHandler)
-    parser.parse(open(CONFIG))
-    registro = pHandler.diccionario
-    HOST = registro["ip"]
-    PORT = int(registro["port"])
-    serv = SocketServer.UDPServer((HOST, PORT), SIPHandler)
-    print "Server " + registro["name"] + " Listening at port " + registro["port"] 
-    serv.serve_forever()
-except IndexError:
-    print "Usage: python proxy_registrar.py config"
+
+    def restablecer():
+        #Obtiene datos de usuarios ya registrados
+        diccionario = {}
+        base_datos = open(registro["database_path"])
+        for linea in base_datos:
+            if linea != "":
+                line = linea.split('\t')
+                lista = (line[1], line[2])
+                diccionario[line[0]] = lista
+        base_datos.close()
+        print diccionario
+        return diccionario
+
+    try:
+        CONFIG= sys.argv[1]
+        #Leemos la DTD usando la clase definida en client.py
+        parser = make_parser()
+        pHandler = uaserver.DtdXMLHandler()
+        parser.setContentHandler(pHandler)
+        parser.parse(open(CONFIG))
+        registro = pHandler.diccionario
+        log = write_log()
+        log_path = registro["log_path"]
+        log_pr = open(log_path, "a")
+        log_pr.write("...Starting")
+        log_pr.close()
+        HOST = registro["ip"]
+        PORT = int(registro["port"])
+        #usuarios = restablecer()
+        serv = SocketServer.UDPServer((HOST, PORT), SIPHandler)
+        print "Server " + registro["name"] + " Listening at port " + registro["port"]
+        serv.serve_forever()
+    except IndexError:
+        print "Usage: python proxy_registrar.py config"
