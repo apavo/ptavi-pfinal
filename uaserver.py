@@ -10,35 +10,40 @@ import os
 from xml.sax import make_parser
 from xml.sax.handler import ContentHandler
 from threading import Thread
+import proxy_registrar
 
 class VLC(Thread):
 
     def __init__(self, ip_ua, puerto_rtp):
-      Thread.__init__(self)
-      self.ip_ua = ip_ua
-      self.puerto_rtp = puerto_rtp
+        Thread.__init__(self)
+        self.ip_ua = ip_ua
+        self.puerto_rtp = puerto_rtp
 
     def run(self):
-        aEjecutar = "cvlc rtp://@" + self.ip_ua + ":" + str(self.puerto_rtp) + " &"
+        aEjecutar = "cvlc rtp://@" + self.ip_ua + ":"
+        aEjecutar += str(self.puerto_rtp) + " &"
         print aEjecutar
         os.system(aEjecutar)
+
 
 class send_audio():
 
     def __init__(self, ip_ua, puerto_rtp, audio, send_ip, send_port):
-      self.ip_rtp = ip_ua
-      self.port_rtp = puerto_rtp
-      self.audio = audio
-      self.send_port = send_port
-      self.send_ip = send_ip
-    def enviar(self): 
+        self.ip_rtp = ip_ua
+        self.port_rtp = puerto_rtp
+        self.audio = audio
+        self.send_port = send_port
+        self.send_ip = send_ip
+
+    def enviar(self):
         hilo_reproducir = VLC(self.send_ip, self.send_port)
-        hilo_reproducir.start()  
+        hilo_reproducir.start()
         aEjecutar = './mp32rtp -i ' + self.ip_rtp + ' -p ' + self.port_rtp
         aEjecutar += ' < ' + self.audio
         print aEjecutar
         os.system(aEjecutar)
         print "Audio enviado"
+
 
 class DtdXMLHandler(ContentHandler):
     """
@@ -88,40 +93,70 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
         # Extraemos el metodo que nos envia el cliente
         linea = line.split(" ")
         metodo = linea[0]
-        IP = str(self.client_address[0])
+        ip_received = str(self.client_address[0])
+        port_received = str(self.client_address[1])
         if metodo == "INVITE":
             #Obtenemos la informacion contenida en SDP
             informacion = line.split('\r\n')
             self.lista[0] = informacion[4].split(" ")[1]
             self.lista[1] = informacion[7].split(" ")[1]
+            #escribimos el mensaje recibido
+            evento = " Received from " + ip_received + ":"
+            evento += port_received + ": " + line
+            log.wr(log_path, evento)
             #Creamos los mensajes de respuesta
             line = 'SIP/2.0 100 Trying' + '\r\n' + '\r\n'
             line += 'SIP/2.0 180 Ringing' + '\r\n' + '\r\n'
             line += 'SIP/2.0 200 OK' + '\r\n'
             line += 'Content-Type:apliccation/SDP\r\n\r\nv=0\r\no='
-            line += " " + registro['uaserver_ip'] + '\r\ns=misesion\r\nt=0\r\n'
-            line += registro['username'] + 'm=audio '
-            line += registro['rtpaudio_puerto'] + ' RTP\r\n'
+            line += registro['username'] + " " + registro['uaserver_ip']
+            line += '\r\ns=misesion\r\nt=0\r\n' + 'm=audio '
+            line += registro['rtpaudio_puerto'] + ' RTP\r\n\r\n'
             self.wfile.write(line)
+            evento = " Send to " + ip_received + ":"
+            evento += port_received + ": " + line
+            log.wr(log_path, evento)
         elif metodo == "ACK":
+            evento = " Received from " + ip_received + ":"
+            evento += port_received + ": " + line
+            log.wr(log_path, evento)
             #Enviamos el audio
             AUDIO = registro['audio_path']
             listen_port = registro['rtpaudio_puerto']
-            reproducir = send_audio(self.lista[0], self.lista[1], AUDIO, HOST, listen_port )
+            reproducir = send_audio(self.lista[0], self.lista[1],
+            AUDIO, HOST, listen_port)
             reproducir.enviar()
         elif metodo == "BYE":
+            evento = " Received from " + ip_received + ":"
+            evento += port_received + ": " + line
+            log.wr(log_path, evento)
             line = 'SIP/2.0 200 OK' + '\r\n'
             line += 'Content-Type:apliccation/SDP\r\n\r\nv=0\r\no='
             line += registro['username'] + " " + registro['uaserver_ip']
             line += '\r\ns=misesion\r\nt=0\r\n' + 'm=audio '
             line += registro['rtpaudio_puerto'] + ' RTP\r\n'
             self.wfile.write(line)
+            evento = " Send to " + ip_received + ":"
+            evento += port_received + ": " + line
+            log.wr(log_path, evento)
         elif metodo != "INVITE" or "ACK" or "BYE":
+            evento = " Received from " + ip_received + ":"
+            evento += port_received + ": " + line
+            log.wr(log_path, evento)
             line = "SIP/2.0 405 Method Not Allowed" + '\r\n' + '\r\n'
             self.wfile.write(line)
+            evento = " Send to " + ip_received + ":"
+            evento += port_received + ": " + line
+            log.wr(log_path, evento)
         else:
+            evento = " Received from " + ip_received + ":"
+            evento += port_received + ": " + line
+            log.wr(log_path, evento)
             line = "SIP/2.0 400 Bad Request" + '\r\n' + '\r\n'
             self.wfile.write(line)
+            evento = " Send to " + ip_received + ":"
+            evento += port_received + ": " + line
+            log.wr(log_path, evento)
 
     def handle(self):
         # Escribe dirección y puerto del cliente (de tupla client_address)
@@ -148,6 +183,8 @@ if __name__ == "__main__":
         registro = sHandler.diccionario
         HOST = registro["uaserver_ip"]
         PORT = int(registro["uaserver_puerto"])
+        log_path = registro["log_path"]
+        log = proxy_registrar.write_log()
         serv = SocketServer.UDPServer((HOST, PORT), SIPHandler)
         print "Listening..."
         serv.serve_forever()
