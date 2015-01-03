@@ -11,9 +11,9 @@ from xml.sax.handler import ContentHandler
 import time
 import uaserver
 import proxy_registrar
+
+
 # Cliente SIP simple.
-
-
 if __name__ == "__main__":
 
     def procesar_contestacion(data):
@@ -29,13 +29,14 @@ if __name__ == "__main__":
             line = "ACK " + 'sip:' + opcion + ' SIP/2.0'
             line += '\r\n' + '\r\n'
             my_socket.send(line)
-            my_socket.recv(1024)      
+            my_socket.recv(1024)
             linea = "Send to " + ip_proxy
             linea += ":" + puerto_proxy + " " + line
             log.wr(log_path, linea)
             #enviamos el audio y lanzamos el hilo de escucha
             audio = registro["audio_path"]
-            reproducir = uaserver.send_audio(ip_rtp, port_rtp, audio, ip_ua, puerto_rtp)
+            reproducir = uaserver.send_audio(ip_rtp, port_rtp,
+            audio, ip_ua, puerto_rtp)
             reproducir.enviar()
 try:
     CONFIG = sys.argv[1]
@@ -80,7 +81,7 @@ try:
         line += "v=0\r\no=" + usuario + " " + ip_ua + "\r\ns=misesion"
         line += "\r\nt=0\r\nm=audio " + puerto_rtp + " RTP"
         evento = " Sent to " + ip_proxy + ":" + puerto_proxy
-        evento += " " +  line
+        evento += " " + line
         log.wr(log_path, evento)
         #Recibimos la contestacion y la anlizamos
         my_socket.send(line)
@@ -97,7 +98,7 @@ try:
         print data
     else:
         #Sí se escribe cualquier otro metodo lo enviamos
-        line = metodo + "sip:" + sys.argv[3] + "SIP/2.0\r\n\r\n"
+        line = metodo + " sip:" + sys.argv[3] + "SIP/2.0\r\n\r\n"
         my_socket.send(line)
         data = my_socket.recv(1024)
         print data
@@ -106,10 +107,9 @@ try:
 
 except socket.error:
     print "Error: No server listening at" + " " + ip_proxy + " " + puerto_proxy
-    hora = time.strftime('%Y%m%d%H%M%S',
-    time.gmtime(time.time()))
-    log_ua.write(hora + "Error: No server listening at" + " " + ip_proxy
-    + " " + str(puerto_proxy))
+    evento = " Error: No server listening at " + ip_proxy
+    evento += " " + str(puerto_proxy)
+    log.wr(log_path, evento)
 except ValueError:
     print "Usage: python uaclient.py config method option"
 except IndexError:
