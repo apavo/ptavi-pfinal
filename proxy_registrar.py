@@ -12,6 +12,7 @@ from xml.sax import make_parser
 from xml.sax.handler import ContentHandler
 import time
 
+
 class write_log():
 
     def wr(self, log_path, linea):
@@ -20,6 +21,7 @@ class write_log():
         time.gmtime(time.time()))
         log.write(hora + " " + linea + '\r\n')
         log.close
+
 
 class identification():
 
@@ -31,7 +33,7 @@ class identification():
             datos = usuario.split(" ")
             diccionario[datos[0]] = datos[1]
         return diccionario
- 
+
     def comprobar_cliente(self, diccionario, cliente, pasword):
         claves = self.diccionario.keys()
         correcto = False
@@ -46,7 +48,7 @@ class identification():
                 else:
                     n = n + 1
         return correcto
-     
+
 
 class SIPHandler(SocketServer.DatagramRequestHandler):
     """
@@ -57,8 +59,7 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
     def buscar_datos(self):
         #Comprueba que el cliente este regitrado y su puerto
         encontrado = False
-        IP = str(self.client_address[0])  
-        port = 0
+        IP = str(self.client_address[0])
         n = 0
         claves = self.diccionario.keys()
         if len(claves) == 0:
@@ -68,15 +69,14 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
             while not encontrado and n < len(claves):
                 if self.diccionario[claves[n]][0] == IP:
                     encontrado = True
-                    port = claves[n][1]
                 else:
                     n = n + 1
-        return encontrado,port
+        return encontrado
 
     def reenvio(self, ip_ua1, port_ua1, metodo, direccion, line):
         #Envia el mensaje al destinatario
         ip_ua2 = self.diccionario[direccion][0]
-        port_ua2 = self.diccionario[direccion][1] 
+        port_ua2 = self.diccionario[direccion][1]
         #Escribimos el mensaje recibido
         evento = " Received from " + ip_ua1 + ":"
         evento += str(port_ua1) + ": " + line
@@ -93,16 +93,15 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
         if metodo != "ACK":
             data = my_socket.recv(1024)
             my_socket.close()
-            evento =' Received from ' + ip_ua2 + ": "
+            evento = ' Received from ' + ip_ua2 + ": "
             evento += port_ua2 + data
             log.wr(log_path, evento)
             #Enviamos la contestacion del destinatario al cliente
             self.wfile.write(data)
             print data
             evento = "Send to " + ip_ua1 + ":" + str(port_ua1)
-            evento += ":" + data
+            evento += ": " + data
             log.wr(log_path, evento)
-
 
     def procesar(self, line, HOST):
         """
@@ -114,31 +113,41 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
         direccion = linea[1].split(":")[1]
         if metodo == "REGISTER":
             #Obtenemos los datos del cliente y los guardamos en un diccionario
-            IP_CLIENT = str(self.client_address[0])
-            PORT_CLIENT = linea[1].split(":")[-1]
+            ip_client = str(self.client_address[0])
+            port_listen = linea[1].split(":")[-1]
+            port_send = str(self.client_address[1])
             expires = linea[-1].split(":")[-1]
             EXPIRES = expires.split("\r\n")[0]
-            lista = (IP_CLIENT,PORT_CLIENT)
+            lista = (ip_client, port_listen)
             self.diccionario[direccion] = lista
             fecha_registro = time.time()
             #Abrimos el fichero para escribir los datos del nuevo usuario
             database = open(registro["database_path"], "a")
-            database.write(direccion + "\t" + IP_CLIENT + "\t" + PORT_CLIENT
+            database.write(direccion + "\t" + ip_client + "\t" + port_listen
             + "\t" + str(fecha_registro) + "\t" + EXPIRES + '\r\n')
+            database.close()
             #Abrimos el fichero log y escribimos el mensaje recibido
-            evento = " Received from " + IP_CLIENT + ":"
-            evento += PORT_CLIENT + ": " + line
+            evento = " Received from " + ip_client + ":"
+            evento += port_send + ": " + line
             log.wr(log_path, evento)
             #enviamos la confimacion al cliente
             respuesta = 'SIP/2.0 200 OK' + '\r\n' + '\r\n'
             self.wfile.write(respuesta)
-            evento = " Send to " + IP_CLIENT + ":"
-            evento += PORT_CLIENT + ": " + line
+            evento = " Send to " + ip_client + ":"
+            evento += port_send + ": " + line
             log.wr(log_path, evento)
-            database.close()
-            
+
+        elif metodo != "INVITE" and metodo != "BYE" and metodo != "ACK":
+            #si nos envia un metodo no valido se lo notificamos
+            linea = "SIP/2.0 405 Method Not Allowed" + '\r\n' + '\r\n'
+            print linea
+            self.wfile.write(linea)
+            evento = "Send to: " + str(self.client_address[0])
+            evento += ":" + str(self.client_address[1]) + ":" + linea
+            log.wr(log_path, evento)
+
         else:
-            #Buscamos al usuario en el diccionario
+            #Buscamos al destinatario en el diccionario
             reg_direcciones = self.diccionario.keys()
             registrado = False
             n = 0
@@ -146,54 +155,37 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
                 if direccion == reg_direcciones[n]:
                     registrado = True
                     direccion = reg_direcciones[n]
-                else: 
-                    n = n + 1
-            if registrado:
-                if metodo == "INVITE" or "BYE" or "ACK":
-                    if metodo == "INVITE":
-                        #Obtenemos los datos del cliente contenidos en SDP
-                        informacion = line.split('\r\n')
-                        ip_ua1 = informacion[4].split(" ")[1]
-                        port_ua1 = informacion[7].split(" ")[1]
-                        self.reenvio(ip_ua1, port_ua1, metodo, direccion, line)
-                    elif metodo == "BYE" or "ACK":
-                        #Comprobamos que el emisor esta registrado y si es asi obtenemos sus datos
-                        encontrado,port_ua1 = self.buscar_datos()
-                        if encontrado:
-                             ip_ua1 = str(self.client_address[0])
-                             self.reenvio(ip_ua1, port_ua1, metodo, direccion, line)
-                        else:
-                            self.wfile.write("Debes registrarte primero") ### REVISAAAAAAAAAAAAAARRRRRRRRRRRRRRRRRRRR!!!!!!!!!!!!!!!
-                    else:
-                        linea = "SIP/2.0 400 Bad Request" + "\r\n\r\n"
-                        print linea
-                        self.wfile.write(linea)
-                        hora = hora = time.strftime('%Y%m%d%H%M%S',
-                        time.gmtime(time.time()))
-                        encontrado,port = self.buscar_datos()
-                        evento = " Send to: " + str(self.client_address[0])
-                        evento += ":" + port + ": " + linea
-                        log.wr(log_path, evento)    
                 else:
-                    #si nos envia un metodo no valido se lo notificamos
-                    linea = "SIP/2.0 405 Method Not Allowed" + '\r\n' + '\r\n'
+                    n = n + 1
+            #comprobamos que el cliente esta registrado
+            encontrado = self.buscar_datos()
+            if registrado and encontrado:
+                if metodo == "INVITE":
+                    #Obtenemos ip y puerto de envio
+                    ip_ua1 = str(self.client_address[0])
+                    port_ua1 = str(self.client_address[1])
+                    self.reenvio(ip_ua1, port_ua1, metodo, direccion, line)
+                elif metodo == "BYE" or "ACK":
+                    ip_ua1 = str(self.client_address[0])
+                    port_ua1 = str(self.client_address[1])
+                    self.reenvio(ip_ua1, port_ua1, metodo,
+                    direccion, line)
+                else:
+                    #metodo mal formado
+                    linea = "SIP/2.0 400 Bad Request" + "\r\n\r\n"
                     print linea
                     self.wfile.write(linea)
-                    encontrado,port = self.buscar_datos()
-                    evento ="Send to: " + str(self.client_address[0])
-                    evento += ":" + port + ":" + linea
-                    log.wr(log_path, evento)      
-            else:
-                encontrado,port = self.buscar_datos()
-                if encontrado:
-                    linea = "SIP/2.0 404 User Not Found: usuario no registrado"
-                    self.wfile.write(linea)
-                    evento ="Send to: " + str(self.client_address[0]) 
-                    evento += ":" + str(port) + ":" + linea
+                    evento = " Send to: " + str(self.client_address[0])
+                    evento += ":" + str(self.client_address[1]) + ": " + linea
                     log.wr(log_path, evento)
-                else:
-                    self.wfile.write("Debes registrarte primero") ### REVISAAAAAAAAAAAAAARRRRRRRRRRRRRRRRRRRR!!!!!!!!!!!!!!!
-                              
+            else:
+                #Usuario o cliente no registrados
+                linea = "SIP/2.0 404 User Not Found: usuario no registrado"
+                self.wfile.write(linea)
+                evento = "Send to: " + str(self.client_address[0])
+                evento += ":" + str(self.client_address[1]) + ":" + linea
+                log.wr(log_path, evento)
+
     def handle(self):
         # Escribe dirección y puerto del cliente (de tupla client_address)
         while 1:
@@ -222,7 +214,7 @@ if __name__ == "__main__":
         return diccionario
 
     try:
-        CONFIG= sys.argv[1]
+        CONFIG = sys.argv[1]
         #Leemos la DTD usando la clase definida en client.py
         parser = make_parser()
         pHandler = uaserver.DtdXMLHandler()
