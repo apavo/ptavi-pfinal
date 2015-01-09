@@ -11,8 +11,13 @@ from xml.sax import make_parser
 from xml.sax.handler import ContentHandler
 from threading import Thread
 import proxy_registrar
+import random
+import string
+
 
 class VLC(Thread):
+
+    """Crea un hilo para lanzar VLC"""
 
     def __init__(self, ip_ua, puerto_rtp):
         Thread.__init__(self)
@@ -21,12 +26,36 @@ class VLC(Thread):
 
     def run(self):
         aEjecutar = "cvlc rtp://@" + self.ip_ua + ":"
-        aEjecutar += str(self.puerto_rtp) + " &"
+        aEjecutar += str(self.puerto_rtp) + " 2>/dev/null"
         print aEjecutar
-        os.system(aEjecutar)
+        os.system(aEjecutar + "&")
+
+
+class crear_cabeceraproxy():
+
+    """Crea cabecera proxy"""
+    def __init__(self, ip_proxy, puerto_proxy):
+        self.ip_proxy = ip_proxy
+        self.puerto_proxy = puerto_proxy
+
+    def cabecera_proxy(self):
+        caracteres = string.ascii_uppercase + string.digits
+        caracteres += string.ascii_lowercase
+        lista = []
+        #formamos el numero aleatorio
+        for n in range(14):
+            lista.append(random.choice(caracteres))
+        branch = "".join(lista)
+        #creamos la cabecera
+        cabecera = "Via: SIP/2.0/UDP "
+        cabecera += self.ip_proxy + ":"
+        cabecera += self.puerto_proxy + " branch= " + branch
+        return cabecera
 
 
 class send_audio():
+
+    """Envia audio via RTP"""
 
     def __init__(self, ip_ua, puerto_rtp, audio, send_ip, send_port):
         self.ip_rtp = ip_ua
@@ -35,6 +64,7 @@ class send_audio():
         self.send_port = send_port
         self.send_ip = send_ip
 
+    #Crea un hilo y envia RTP
     def enviar(self):
         hilo_reproducir = VLC(self.send_ip, self.send_port)
         hilo_reproducir.start()
@@ -70,8 +100,8 @@ class DtdXMLHandler(ContentHandler):
         elif name == "database":
             self.guardar(attrs)
 
+    #Guarda en un diccionario los atributos de cada etiqueta
     def guardar(self, attrs):
-        #Guarda en un diccionario los atributos de cada etiqueta
         atributos = attrs.keys()
         n = 0
         while n < len(atributos):
@@ -98,8 +128,9 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
         if metodo == "INVITE":
             #Obtenemos la informacion contenida en SDP
             informacion = line.split('\r\n')
-            self.lista[0] = informacion[4].split(" ")[1]
-            self.lista[1] = informacion[7].split(" ")[1]
+            print informacion
+            self.lista[0] = informacion[5].split(" ")[1]
+            self.lista[1] = informacion[-1].split(" ")[1]
             #escribimos el mensaje recibido
             evento = " Received from " + ip_received + ":"
             evento += port_received + ": " + line
@@ -108,6 +139,7 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
             line = 'SIP/2.0 100 Trying' + '\r\n' + '\r\n'
             line += 'SIP/2.0 180 Ringing' + '\r\n' + '\r\n'
             line += 'SIP/2.0 200 OK' + '\r\n'
+            line += cab_proxy.cabecera_proxy() + '\r\n'
             line += 'Content-Type:apliccation/SDP\r\n\r\nv=0\r\no='
             line += registro['username'] + " " + registro['uaserver_ip']
             line += '\r\ns=misesion\r\nt=0\r\n' + 'm=audio '
@@ -131,6 +163,7 @@ class SIPHandler(SocketServer.DatagramRequestHandler):
             evento += port_received + ": " + line
             log.wr(log_path, evento)
             line = 'SIP/2.0 200 OK' + '\r\n'
+            line += cab_proxy.cabecera_proxy() + '\r\n'
             line += 'Content-Type:apliccation/SDP\r\n\r\nv=0\r\no='
             line += registro['username'] + " " + registro['uaserver_ip']
             line += '\r\ns=misesion\r\nt=0\r\n' + 'm=audio '
@@ -185,8 +218,15 @@ if __name__ == "__main__":
         PORT = int(registro["uaserver_puerto"])
         log_path = registro["log_path"]
         log = proxy_registrar.write_log()
+        cab_proxy = crear_cabeceraproxy(
+        registro["regproxy_ip"], registro["regproxy_puerto"])
         serv = SocketServer.UDPServer((HOST, PORT), SIPHandler)
         print "Listening..."
         serv.serve_forever()
     except IndexError:
         print "Usage: python uaserver.py config"
+    except KeyboardInterrupt:
+        log = open(log_path, "a")
+        log.write("...Finishing\r\n")
+        log.close()
+        print "Closing Server..."
