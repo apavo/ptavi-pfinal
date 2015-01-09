@@ -1,0 +1,8 @@
+<config>
+    <account username="juan@universidad.com"/>
+    <uaserver uaserver_ip="127.0.0.1" uaserver_puerto="4000"/>
+    <rtpaudio rtpaudio_puerto="23033"/>
+    <regproxy regproxy_ip="127.0.0.1" regproxy_puerto="7000"/>
+    <log log_path="log_ua2.txt"/>
+    <audio audio_path="cancion.mp3"/>
+</config>
