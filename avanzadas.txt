@@ -1,5 +1,5 @@
 Cabecera proxy
 Restablecer usuarios conectados
-Integración (c)vlc
-Integración (c)vlc con hilos
-Consitencia frente a valores erroneos
+Integración de (c)vlc
+Integración de (c)vlc con hilos
+Consitencia frente a valores erróneos
