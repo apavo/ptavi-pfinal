@@ -1,0 +1,5 @@
+Cabecera proxy
+Restablecer usuarios conectados
+Integración (c)vlc
+Integración (c)vlc con hilos
+Consitencia frente a valores erroneos
