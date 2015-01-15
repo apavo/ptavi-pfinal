@@ -65,7 +65,8 @@ class VLCThread(threading.Thread):
     def run(self):
         # Ponemos el vlc a escuchar para la reproducción por los altavoces
         # en segundo plano (&)
-        aEjecutar1 = 'cvlc rtp://@' + self.IpClient + ':' + self.mp3port + ' &'
+        aEjecutar1 = 'cvlc rtp://@' + self.IpClient + ':' + self.mp3port
+        aEjecutar1 += " 2>/dev/null" + "&"
         print "Vamos a ejecutar", aEjecutar1
         os.system(aEjecutar1)
 
