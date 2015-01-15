@@ -170,6 +170,7 @@ class SIPRegisterHandler(SocketServer.DatagramRequestHandler):
                             except socket.error:
                                 Error = 'Error: no user agent server listening'
                                 print Error
+                                Error = "SIP/2.0 404 User Not Found"
                                 self.wfile.write(Error)
                             my_socket.close()
                     if method == 'Ack':
@@ -229,6 +230,8 @@ class SIPRegisterHandler(SocketServer.DatagramRequestHandler):
                             except socket.error:
                                 Error = 'Error: no user agent server listening'
                                 print Error
+                                Error = "SIP/2.0 404 User Not Found"
+                                self.wfile.write(Error)
                             my_socket.close()
 
                 elif not method in method_list:
